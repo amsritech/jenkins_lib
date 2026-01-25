@@ -1,0 +1,18 @@
+apiVersion: extensions/v1beta1 
+kind: Deployment 
+metadata:
+   name: Tomcat-ReplicaSet
+spec:
+   replicas: 3
+   template:
+      metadata:
+         lables:
+            app: Tomcat-ReplicaSet
+            tier: Backend
+   spec:
+      containers:
+         - name: Tomcatimage:
+            tomcat: 8.0
+            ports:
+               - containerPort: 7474
+
