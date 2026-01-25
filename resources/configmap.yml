@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap-file
+data:
+  config.properties: |
+    # Contents of your configuration file
+    key1=value1
+    key2=value2
+    key3=value3

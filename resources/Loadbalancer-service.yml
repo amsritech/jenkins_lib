@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-loadbalancer-service
+  labels:
+    app: my-app
+spec:
+  selector:
+    app: my-app
+  ports:
+    - protocol: TCP
+      port: 80 # Port exposed on the service
+      targetPort: 8080 # Port on the pods the service will direct traffic to
+  type: LoadBalancer # Define the service type as LoadBalancer
