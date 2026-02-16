@@ -1,0 +1,13 @@
+| Option         | Description                             | Example                                 |
+| -------------- | --------------------------------------- | --------------------------------------- |
+| `-i`           | Ignore case                             | `grep -i "error" logfile.txt`           |
+| `-v`           | Invert match (print lines NOT matching) | `grep -v "error" logfile.txt`           |
+| `-c`           | Count matching lines                    | `grep -c "error" logfile.txt`           |
+| `-n`           | Show line numbers                       | `grep -n "error" logfile.txt`           |
+| `-r` or `-R`   | Recursive search in directories         | `grep -r "error" /var/log`              |
+| `-l`           | List file names with matches            | `grep -l "error" *.log`                 |
+| `-w`           | Match whole words only                  | `grep -w "error" logfile.txt`           |
+| `-A NUM`       | Show NUM lines **after** match          | `grep -A 3 "error" logfile.txt`         |
+| `-B NUM`       | Show NUM lines **before** match         | `grep -B 3 "error" logfile.txt`         |
+| `-C NUM`       | Show NUM lines **around** match         | `grep -C 3 "error" logfile.txt`         |
+| `--color=auto` | Highlight matched text                  | `grep --color=auto "error" logfile.txt` |
