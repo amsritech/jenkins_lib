@@ -1,0 +1,11 @@
+terraform-project/
+│
+├── provider.tf
+├── variables.tf
+├── vpc.tf
+├── subnet.tf
+├── igw.tf
+├── route_table.tf
+├── security_group.tf
+├── ec2.tf
+├── outputs.tf
