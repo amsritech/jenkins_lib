@@ -1,0 +1,81 @@
+name: CI/CD Pipeline
+
+on:
+ push:
+ branches: 
+ pull_request:
+ branches: 
+
+jobs:
+ build-test-scan-deploy:
+ runs-on: ubuntu-latest
+
+ env:
+ AWS_REGION: us-west-2 # adjust as needed
+ EKS_CLUSTER: my-eks-cluster # your EKS cluster name
+ IMAGE_NAME: myapp # Docker image name
+ IMAGE_TAG: ${{ github.sha }}
+
+ steps:
+ # 1️⃣ Checkout repository
+ - name: Checkout repository
+ uses: actions/checkout@v3
+
+ # 2️⃣ Set up Docker Buildx
+ - name: Set up Docker Buildx
+ uses: docker/setup-buildx-action@v2
+
+ # 3️⃣ Log in to Amazon ECR (or your registry)
+ - name: Configure AWS credentials
+ uses: aws-actions/configure-aws-credentials@v2
+ with:
+ aws-region: ${{ env.AWS_REGION }}
+ role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsECRAccess # replace
+
+ - name: Login to Amazon ECR
+ run: |
+ aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin .dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+ # 4️⃣ Build Docker image
+ - name: Build Docker image
+ run: |
+ docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} .
+ docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} .dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+ # 5️⃣ Run unit/integration tests
+ - name: Run tests
+ run: |
+ # replace with your test command, e.g.:
+ ./run-tests.sh
+
+ # 6️⃣ Install Trivy
+ - name: Install Trivy
+ run: |
+ sudo apt-get update && sudo apt-get install -y wget
+ wget https://github.com/aquasecurity/trivy/releases/download/v0.49.1/trivy_0.49.1_Linux-64bit.tar.gz
+ tar -xzf trivy_0.49.1_Linux-64bit.tar.gz trivy
+ sudo mv trivy /usr/local/bin/
+
+ # 7️⃣ Scan image with Trivy (fail on HIGH/CRITICAL)
+ - name: Scan Docker image
+ run: |
+ trivy image --severity HIGH,CRITICAL --ignore-unfixed .dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+ # 8️⃣ Push image to ECR
+ - name: Push Docker image
+ run: |
+ docker push .dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+ # 9️⃣ Set up kubectl for EKS
+ - name: Configure kubectl
+ uses: aws-actions/eks-kubectl@v2
+ with:
+ cluster-name: ${{ env.EKS_CLUSTER }}
+ aws-region: ${{ env.AWS_REGION }}
+
+ # 10️⃣ Deploy to EKS (apply Kubernetes manifest)
+ - name: Deploy to EKS
+ run: |
+ # Ensure you have a k8s deployment yaml that references the image tag
+ kubectl set image deployment/${{ env.IMAGE_NAME }} ${{ env.IMAGE_NAME }}=.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} --record
+ kubectl rollout status deployment/${{ env.IMAGE_NAME }} --timeout=120s
