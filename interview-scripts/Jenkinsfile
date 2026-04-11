@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME        = "my-microservice"
+        AWS_ACCOUNT_ID  = "123456789012"
+        AWS_REGION      = "us-east-1"
+        ECR_REPO        = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_NAME}"
+        IMAGE_TAG       = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
+        
+        // Tool Definitions
+        MAVEN_HOME      = tool 'M3' // Must match your Jenkins Global Tool name
+        SONAR_TOOL      = tool 'sonar-scanner'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/your-repo/app.git'
+            }
+        }
+
+        // --- NEW STAGE: ARTIFACT BUILD ---
+        stage('Build Artifact & Unit Tests') {
+            steps {
+                script {
+                    echo "Building JAR file and running unit tests..."
+                    // -DskipTests=false ensures we actually validate the code
+                    sh "${MAVEN_HOME}/bin/mvn clean package -DskipTests=false"
+                }
+            }
+            post {
+                success {
+                    echo "Archiving Build Artifacts..."
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    withSonarQubeEnv('SonarQube-Server') {
+                        sh "${SONAR_TOOL}/bin/sonar-scanner -Dsonar.projectKey=${APP_NAME}"
+                    }
+                }
+            }
+        }
+
+        stage('Build & Scan Image') {
+            steps {
+                script {
+                    // We pass the JAR as a build-arg or ensure Dockerfile copies from 'target/'
+                    sh "docker build --build-arg JAR_FILE=target/*.jar -t ${ECR_REPO}:${IMAGE_TAG} ."
+                    
+                    echo "Scanning Image with Trivy..."
+                    sh "trivy image --exit-code 1 --severity HIGH,CRITICAL ${ECR_REPO}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                script {
+                    sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                    sh "docker push ${ECR_REPO}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                script {
+                    sh "aws eks update-kubeconfig --region ${AWS_REGION} --name prod-cluster"
+                    sh "envsubst < k8s/deployment.yaml | kubectl apply -f -"
+                }
+            }
+        }
+    }
+}

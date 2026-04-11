@@ -1,0 +1,30 @@
+stage('Resilient EKS Deployment') {
+    steps {
+        script {
+            int maxRetries = 3
+            int attempt = 0
+            
+            retry(maxRetries) {
+                attempt++
+                try {
+                    timeout(time: 2, unit: 'MINUTES') {
+                        echo "Attempt ${attempt}: Deploying to EKS..."
+                        // Simulated deployment command
+                        sh "kubectl apply -f k8s/deployment.yaml"
+                        sh "kubectl rollout status deployment/my-app --timeout=60s"
+                    }
+                } catch (Exception e) {
+                    if (attempt < maxRetries) {
+                        // Exponential Backoff: Wait 10s, then 20s, then 40s...
+                        int waitTime = 10 * (2 ** (attempt - 1))
+                        echo "Deployment failed. Retrying in ${waitTime}s..."
+                        sleep waitTime
+                        throw e // Rethrow to trigger the 'retry' block
+                    } else {
+                        error "Final attempt failed: ${e.message}"
+                    }
+                }
+            }
+        }
+    }
+}
